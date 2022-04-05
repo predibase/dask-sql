@@ -56,11 +56,11 @@ class PredictModelPlugin(BaseRelPlugin):
 
         # TODO: Handle multiple targets here
         target_list = sql.getTargetList()
-        _, target_name = context.fqn(target_list[0])
+        _, target_name = context.fqn(target_list[0].getName())
 
-        # Get model name
-        if sql.getModel():
-            schema_name, model_name = context.fqn(sql.getModel().getName())
+        # Get model name from target
+        if target_list[0].getModel():
+            schema_name, model_name = context.fqn(target_list[0].getModel().getName())
         else:
             # Use default context to get first model_name from target_name
             schema_name = context.schema_name
@@ -73,13 +73,19 @@ class PredictModelPlugin(BaseRelPlugin):
             f"Predicting from {model_name} and query {sql_select} targets {target_name}"
         )
 
-        model, training_columns = context.schema[schema_name].models[model_name]        
+        model, training_columns = context.schema[schema_name].models[model_name]
         sql_select_query = context._to_sql_string(sql_select)
         df = context.sql(sql_select_query)
 
-        # Make prediction and save against target in dataframe
-        prediction = model.predict(df[training_columns])
-        df[target_name] = prediction
+        # Make predictions
+        predictions = model.predict(df[training_columns])
+
+        # Save prediction name against target data frame
+        if target_list[0].getAlias():
+            _, prediction_name = context.fqn(target_list[0].getAlias())
+        else:
+            prediction_name = target_name + "_prediction"
+        df[prediction_name] = predictions
 
         is_temporary = not sql.getInto()
         if is_temporary:
